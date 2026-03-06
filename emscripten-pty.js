@@ -140,12 +140,24 @@ Object.assign(Lib, {
 
     $PTY_waitForReadableWithAtomicImpl__deps: ['$PTY_waitForReadableWithCallback'],
     $PTY_waitForReadableWithAtomicImpl: (atomicIndex) => {
+#if PROXY_TO_PTHREAD
+        // Emscripten 4.0+: Use C helper function with new proxying API
+        if (typeof _emscripten_pty_wait_for_readable_async !== 'undefined') {
+            _emscripten_pty_wait_for_readable_async(atomicIndex);
+        } else {
+            // Fallback for when C helper isn't available - call directly (main thread only)
+            PTY_waitForReadableWithCallback(type => {
+                Atomics.store(HEAP32, atomicIndex, type);
+                Atomics.notify(HEAP32, atomicIndex);
+            });
+        }
+#else
         PTY_waitForReadableWithCallback(type => {
             Atomics.store(HEAP32, atomicIndex, type);
             Atomics.notify(HEAP32, atomicIndex);
         });
+#endif
     },
-    $PTY_waitForReadableWithAtomicImpl__proxy: 'async',
 
     $PTY_atomicIndex: 0,
 
