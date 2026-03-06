@@ -87,21 +87,6 @@ Object.assign(Lib, {
 
             _raise(signalCode);
         });
-
-#if PTHREADS && PROXY_TO_PTHREAD
-        // Emscripten 4.0+: Set up message handler for PTY wait operations
-        if (typeof addEventListener !== 'undefined') {
-            addEventListener('message', function(e) {
-                if (e.data && e.data.cmd === 'pty_wait_readable') {
-                    var atomicIndex = e.data.atomicIndex;
-                    PTY_waitForReadableWithCallback(function(type) {
-                        Atomics.store(HEAP32, atomicIndex, type);
-                        Atomics.notify(HEAP32, atomicIndex);
-                    });
-                }
-            });
-        }
-#endif
     `),
 
     $PTY_pollTimeout: 0,
@@ -155,27 +140,11 @@ Object.assign(Lib, {
 
     $PTY_waitForReadableWithAtomicImpl__deps: ['$PTY_waitForReadableWithCallback'],
     $PTY_waitForReadableWithAtomicImpl: (atomicIndex) => {
-#if PROXY_TO_PTHREAD
-        // Emscripten 4.0+: Proxy to main thread using postMessage
-        if (ENVIRONMENT_IS_PTHREAD) {
-            // Send message to main thread
-            postMessage({
-                'cmd': 'pty_wait_readable',
-                'atomicIndex': atomicIndex
-            });
-        } else {
-            // Already on main thread
-            PTY_waitForReadableWithCallback(type => {
-                Atomics.store(HEAP32, atomicIndex, type);
-                Atomics.notify(HEAP32, atomicIndex);
-            });
-        }
-#else
+        // Emscripten 4.0+: Call directly - PTY object should be accessible via Module
         PTY_waitForReadableWithCallback(type => {
             Atomics.store(HEAP32, atomicIndex, type);
             Atomics.notify(HEAP32, atomicIndex);
         });
-#endif
     },
 
     $PTY_atomicIndex: 0,
